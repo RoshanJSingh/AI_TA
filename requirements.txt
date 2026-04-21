@@ -1,0 +1,6 @@
+flask
+requests
+numpy
+faiss-cpu
+openai-whisper
+torch
