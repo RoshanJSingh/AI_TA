@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Teaching Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <h1>AI Teaching Assistant</h1>
+        <p class="subtitle">Ask a question about the course and get a short answer with the relevant video section.</p>
+
+        <form action="/" method="POST">
+            <input type="text" name="question" placeholder="Enter your question" required>
+            <input type="submit" value="Get Answer">
+        </form>
+
+        <div class="answer-box">
+            <h3>Answer:</h3>
+            {% if answer %}
+                <p>{{ answer }}</p>
+            {% else %}
+                <p>Your answer will appear here.</p>
+            {% endif %}
+        </div>
+    </div>
+</body>
+</html>
