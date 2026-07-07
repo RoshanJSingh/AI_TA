@@ -1,0 +1,7 @@
+{
+  "name": "ai-ta",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AI Teaching Assistant - Gemini-powered study companion for a web development course"
+}

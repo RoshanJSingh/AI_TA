@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI TA — AI Teaching Assistant</title>
+  <meta name="description" content="AI Teaching Assistant for a web development course. Ask anything about HTML, CSS, JavaScript and more — powered by Google Gemini." />
+  <meta property="og:title" content="AI TA — AI Teaching Assistant" />
+  <meta property="og:description" content="Your personal study companion for web development, powered by Google Gemini." />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8E%93%3C/text%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- ============ Sidebar ============ -->
+    <aside id="sidebar">
+      <div class="sidebar-head">
+        <div class="logo">
+          <div class="logo-badge">🎓</div>
+          <div class="logo-text">
+            <span class="logo-title">AI TA</span>
+            <span class="logo-sub">Teaching Assistant</span>
+          </div>
+        </div>
+        <button class="icon-btn ghost sidebar-close" id="sidebarClose" title="Close sidebar" aria-label="Close sidebar">
+          <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <button id="newChatBtn" class="new-chat-btn">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        New chat
+      </button>
+
+      <div class="chat-list-label">Recent</div>
+      <nav id="chatList" class="chat-list" aria-label="Chat history"></nav>
+
+      <div class="sidebar-foot">
+        <div id="keyStatus" class="key-status">
+          <span class="dot"></span>
+          <span class="key-status-text">Checking key…</span>
+        </div>
+        <div class="sidebar-actions">
+          <button id="settingsBtn" class="foot-btn" title="Settings">
+            <svg viewBox="0 0 24 24"><path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" stroke-width="2"/><path d="M19.4 15a1.7 1.7 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.7 1.7 0 00-1.82-.33 1.7 1.7 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.7 1.7 0 00-1-1.51 1.7 1.7 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.7 1.7 0 00.33-1.82 1.7 1.7 0 00-1.51-1H3a2 2 0 110-4h.09a1.7 1.7 0 001.51-1 1.7 1.7 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.7 1.7 0 001.82.33h.01a1.7 1.7 0 001-1.51V3a2 2 0 114 0v.09a1.7 1.7 0 001 1.51h.01a1.7 1.7 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.7 1.7 0 00-.33 1.82v.01a1.7 1.7 0 001.51 1H21a2 2 0 110 4h-.09a1.7 1.7 0 00-1.51 1z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            Settings
+          </button>
+          <button id="themeBtn" class="foot-btn" title="Toggle theme">
+            <svg class="icon-moon" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></svg>
+            <svg class="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4l1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            <span class="theme-label">Theme</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+    <div id="backdrop"></div>
+
+    <!-- ============ Main ============ -->
+    <main id="main">
+      <header id="topbar">
+        <button class="icon-btn ghost menu-btn" id="menuBtn" aria-label="Open sidebar">
+          <svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <div class="model-picker">
+          <label for="modelSelect" class="sr-only">Model</label>
+          <select id="modelSelect" aria-label="Choose model"></select>
+          <svg class="chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <div class="topbar-spacer"></div>
+        <a class="gh-link" href="https://github.com/RoshanJSingh/AI_TA" target="_blank" rel="noopener" title="View on GitHub">
+          <svg viewBox="0 0 24 24"><path fill="currentColor" d="M12 .5A11.5 11.5 0 000 12a11.5 11.5 0 007.9 10.9c.6.1.8-.2.8-.5v-2c-3.2.7-3.9-1.4-3.9-1.4-.5-1.3-1.3-1.7-1.3-1.7-1-.7.1-.7.1-.7 1.2.1 1.8 1.2 1.8 1.2 1 1.8 2.7 1.3 3.4 1 .1-.8.4-1.3.7-1.6-2.6-.3-5.3-1.3-5.3-5.7 0-1.3.4-2.3 1.2-3.1-.1-.3-.5-1.5.1-3.1 0 0 1-.3 3.2 1.2a11 11 0 015.8 0C17 5 18 5.3 18 5.3c.6 1.6.2 2.8.1 3.1.7.8 1.2 1.8 1.2 3.1 0 4.4-2.7 5.4-5.3 5.7.4.4.8 1.1.8 2.2v3.2c0 .3.2.6.8.5A11.5 11.5 0 0024 12 11.5 11.5 0 0012 .5z"/></svg>
+        </a>
+      </header>
+
+      <div id="scroller">
+        <div id="thread">
+          <!-- Welcome screen (replaced once a chat starts) -->
+          <section id="welcome">
+            <div class="welcome-badge">🎓</div>
+            <h1>Hey, I'm your <span class="grad-text">AI Teaching Assistant</span></h1>
+            <p class="welcome-sub">Ask me anything about web development — HTML, CSS, JavaScript, or programming in general. I'll explain step by step, with examples.</p>
+            <div class="suggestions" id="suggestions"></div>
+          </section>
+        </div>
+      </div>
+
+      <div id="composerWrap">
+        <div class="composer" id="composer">
+          <textarea id="input" rows="1" placeholder="Ask your teaching assistant anything…" aria-label="Message"></textarea>
+          <button id="sendBtn" class="send-btn" title="Send" aria-label="Send message" disabled>
+            <svg class="icon-send" viewBox="0 0 24 24"><path d="M12 19V5m0 0l-6 6m6-6l6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <svg class="icon-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor"/></svg>
+          </button>
+        </div>
+        <p class="composer-hint">Powered by Google Gemini · Responses may contain mistakes — double-check important info.</p>
+      </div>
+    </main>
+  </div>
+
+  <!-- ============ Settings modal ============ -->
+  <div id="modalOverlay" class="modal-overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+      <div class="modal-head">
+        <h2 id="modalTitle">Settings</h2>
+        <button class="icon-btn ghost" id="modalClose" aria-label="Close settings">
+          <svg viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div id="modalNotice" class="modal-notice" hidden></div>
+
+        <label class="field-label" for="apiKeyInput">Your Gemini API key</label>
+        <p class="field-help">
+          Stored only in this browser (localStorage) and sent straight to Google — never to our server.
+          Leave empty to use this site's built-in key (if the owner configured one).
+          Get a free key at <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>.
+        </p>
+        <div class="key-row">
+          <input id="apiKeyInput" type="password" placeholder="AIza…" autocomplete="off" spellcheck="false" />
+          <button id="keyToggle" class="icon-btn" title="Show / hide key" aria-label="Show or hide key">
+            <svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/></svg>
+          </button>
+        </div>
+
+        <label class="field-label" for="contextInput">Course notes <span class="optional">(optional)</span></label>
+        <p class="field-help">Paste lecture notes or transcript snippets here and the assistant will use them when answering questions about your course.</p>
+        <textarea id="contextInput" rows="5" placeholder="e.g. Video 14 covers CSS selectors, the box model…"></textarea>
+
+        <div class="danger-row">
+          <button id="clearDataBtn" class="danger-btn">Clear all chats &amp; data</button>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button id="modalCancel" class="btn ghost-btn">Cancel</button>
+        <button id="modalSave" class="btn primary-btn">Save settings</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.5/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,109 +1,92 @@
-# AI Teaching Assistant
+# AI TA — AI Teaching Assistant
 
-This project is a simple retrieval-based teaching assistant for a web development course. It uses course transcripts to find the most relevant video parts and then generates a short answer with the video number and time range.
+A modern, Gemini-powered teaching assistant for a web development course. Ask anything about HTML, CSS, JavaScript or programming in general and get clear, step-by-step answers with code examples — streamed live into a polished chat interface.
 
-## Project Summary
+**Live app:** deployable to Vercel in one click (see below).
 
-The app works in four steps:
+## Features
 
-1. Convert course videos to MP3 files.
-2. Transcribe the audio files into JSON files.
-3. Create embeddings from the transcript chunks and store them in a FAISS index.
-4. Run a Flask app that answers questions by searching the transcript data and asking a local language model to write the final response.
+- 💬 **Streaming chat UI** — responses render live, with full Markdown, syntax-highlighted code blocks and copy buttons
+- 🗂️ **Chat history** — conversations are saved locally in your browser, with a sidebar to switch between them
+- 🔑 **Bring your own key** — enter your own free Gemini API key in Settings (stored only in your browser, sent directly to Google), or use the site's built-in key if the deployment has one configured
+- 🤖 **Model picker** — Gemini 2.5 Flash / 2.5 Pro / 2.0 Flash / 2.0 Flash Lite
+- 📚 **Course notes** — paste lecture notes or transcripts in Settings and the assistant will use them when answering questions about your course
+- 🌗 **Dark & light themes**, fully responsive (mobile sidebar, safe-area aware)
+- ⏹️ Stop generation, regenerate answers, suggestion cards to get started
 
-## Main Tools
+## How it works
 
-- Python
-- Flask
-- FAISS
-- Ollama
-- OpenAI Whisper
-- FFmpeg
+```
+public/          Static frontend (vanilla JS, no build step)
+api/chat.js      Vercel Edge Function — proxies Gemini using the
+                 server-side GEMINI_API_KEY so the key never ships
+                 to the client
+```
 
-## Folder Use
+- If you saved **your own API key** in Settings, the browser calls the Gemini API **directly** — your key never touches the server.
+- Otherwise the frontend calls `/api/chat`, which uses the `GEMINI_API_KEY` environment variable configured on Vercel.
 
-- `rag_videos/`: source video files
-- `audios/`: generated MP3 files
-- `jsons/`: generated transcript files
-- `templates/`: HTML template
-- `static/`: CSS file
+## Deploy to Vercel
 
-## Requirements
+1. Push this repo to GitHub (already done if you're reading this there).
+2. Go to [vercel.com/new](https://vercel.com/new) and import the repository. The defaults are fine — no build command needed.
+3. *(Optional but recommended)* In **Project Settings → Environment Variables**, add:
+   - `GEMINI_API_KEY` = your Gemini API key ([get one free](https://aistudio.google.com/apikey))
 
-Before you run the project, make sure these tools are available:
+   With this set, visitors can chat without entering a key. Without it, each visitor adds their own key in Settings.
+4. Deploy. Done 🎉
 
-- Python
-- FFmpeg
-- Ollama with the `bge-m3` embedding model
-- Ollama with the `llama3.2` model
+## Run locally
 
-Install Python packages with:
+The frontend is plain static files:
+
+```bash
+# from the repo root
+python -m http.server 5173 --directory public
+# open http://localhost:5173 and add your API key in Settings
+```
+
+Or with the full serverless setup (uses `.env` — copy `.env.example` to `.env` and fill in your key):
+
+```bash
+npm i -g vercel
+vercel dev
+```
+
+---
+
+## Local RAG pipeline (original project)
+
+This repo also contains the original fully-local retrieval pipeline that answers questions from **course video transcripts** using FAISS + Ollama + Whisper.
+
+### Requirements
+
+- Python, FFmpeg
+- Ollama with the `bge-m3` (embeddings) and `llama3.2` (generation) models
 
 ```bash
 pip install -r requirements.txt
 ```
 
-## How To Run
-
-### 1. Add course videos
-
-Place your course videos in the `rag_videos/` folder.
-
-### 2. Convert videos to audio
-
-Run:
+### Steps
 
 ```bash
-python video_to_mp3.py
+# 1. Put course videos in rag_videos/
+python video_to_mp3.py        # 2. Convert videos to MP3 (audios/)
+python mp3_to_json.py         # 3. Transcribe with Whisper (jsons/)
+python json_preprocessing.py  # 4. Build the FAISS index
+python app.py                 # 5. Flask app at http://localhost:5000
 ```
 
-### 3. Transcribe audio files
+The Flask app retrieves the most relevant transcript chunks and answers with the exact video number and time range, e.g. *"CSS is introduced in Video 14 (02:10 - 05:45)."*
 
-Run:
+### Folder guide
 
-```bash
-python mp3_to_json.py
-```
-
-### 4. Build the search index
-
-Run:
-
-```bash
-python json_preprocessing.py
-```
-
-This creates the FAISS index and metadata files used by the app.
-
-### 5. Start the web app
-
-Run:
-
-```bash
-python app.py
-```
-
-Then open:
-
-```text
-http://localhost:5000
-```
-
-## Example Question
-
-Question:
-
-```text
-When is CSS taught in this course?
-```
-
-Expected answer style:
-
-```text
-CSS is introduced in Video 14. See Video 14 (MM:SS - MM:SS) for the relevant section.
-```
-
-## Notes
-
-- The project expects the local models and generated files to be ready before the app starts.
-- The assistant only answers from the transcript data it can retrieve.
+| Folder | Purpose |
+|---|---|
+| `public/` | Web app frontend (deployed to Vercel) |
+| `api/` | Vercel Edge Function (Gemini proxy) |
+| `rag_videos/` | Source video files (local pipeline) |
+| `audios/` | Generated MP3 files |
+| `jsons/` | Generated transcripts |
+| `templates/`, `static/` | Flask app UI (local pipeline) |

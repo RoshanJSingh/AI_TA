@@ -2,8 +2,18 @@ __pycache__/
 *.pyc
 *.webm
 *.mp3
-*.json
+jsons/*.json
+newjsons/
 *.joblib
 *.faiss
 *.pkl
-newjsons/
+
+# secrets
+.env
+.env.local
+.env*.local
+
+# tooling
+.claude/
+.vercel/
+node_modules/
