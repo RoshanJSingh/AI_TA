@@ -1,0 +1,8 @@
+# Local RAG pipeline — not part of the deployed web app
+*.py
+requirements.txt
+templates/
+static/
+audios/
+jsons/
+rag_videos/
