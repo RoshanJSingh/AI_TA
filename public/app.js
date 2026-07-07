@@ -14,6 +14,9 @@ const MODELS = [
 const DEFAULT_MODEL = "gemini-2.5-flash";
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
 const HISTORY_LIMIT = 30; // messages sent as context per request
+const EMBED_MODEL = "gemini-embedding-001";
+const RETRIEVAL_TOP_K = 6;
+const RETRIEVAL_MIN_SCORE = 0.5; // below this, nothing in the course matches
 
 const SYSTEM_PROMPT = `You are "AI TA", a friendly, patient and expert teaching assistant for a web development course covering HTML, CSS, JavaScript and general programming.
 
@@ -47,6 +50,7 @@ const state = {
   activeId: null,
   streaming: false,
   abort: null,
+  courseIndex: null, // loaded from data/index.json when the course was indexed
 };
 
 /* ---------- DOM ---------- */
@@ -266,6 +270,22 @@ function renderThread() {
           note.textContent = "— stopped by you —";
           bubble.appendChild(note);
         }
+        if (message.sources && message.sources.length) {
+          const wrap = document.createElement("div");
+          wrap.className = "sources";
+          const seen = new Set();
+          for (const source of message.sources) {
+            const dedupeKey = `${source.video}@${source.start}`;
+            if (seen.has(dedupeKey)) continue;
+            seen.add(dedupeKey);
+            const chip = document.createElement("span");
+            chip.className = "source-chip";
+            chip.title = source.title;
+            chip.textContent = `📍 Video ${source.video} · ${fmtTime(source.start)}–${fmtTime(source.end)}`;
+            wrap.appendChild(chip);
+          }
+          bubble.appendChild(wrap);
+        }
       }
       appendMessageActions(row, index);
       els.thread.appendChild(row);
@@ -345,8 +365,109 @@ function ensureActiveChat(firstMessage) {
   return chat;
 }
 
+/* ---------- Course retrieval (RAG) ---------- */
+async function loadCourseIndex() {
+  try {
+    const response = await fetch("data/index.json", { cache: "no-cache" });
+    if (!response.ok) return;
+    const index = await response.json();
+    if (!Array.isArray(index.chunks) || !index.chunks.length || !Array.isArray(index.videos)) return;
+    state.courseIndex = index;
+
+    const badge = $("ragBadge");
+    if (badge) {
+      badge.hidden = false;
+      badge.textContent = `📚 Course data · ${index.videos.length} videos`;
+      badge.title = `${index.chunks.length} transcript sections indexed — answers cite video numbers and timestamps`;
+    }
+    SUGGESTIONS.unshift({ emoji: "📚", text: "Where is flexbox taught in this course?" });
+    renderSuggestions();
+  } catch {
+    /* no course index deployed — general mode */
+  }
+}
+
+function fmtTime(seconds) {
+  const total = Math.max(0, Math.round(seconds));
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+async function embedQuery(text, dim) {
+  const userKey = getApiKey();
+  let response;
+  if (userKey) {
+    response = await fetch(`${GEMINI_BASE}/${EMBED_MODEL}:embedContent`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-goog-api-key": userKey },
+      body: JSON.stringify({
+        content: { parts: [{ text }] },
+        taskType: "RETRIEVAL_QUERY",
+        outputDimensionality: dim,
+      }),
+    });
+  } else {
+    response = await fetch("/api/embed", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, dim }),
+    });
+  }
+  if (!response.ok) throw new Error(`Embedding failed (HTTP ${response.status})`);
+  const values = (await response.json()).embedding?.values;
+  if (!Array.isArray(values)) throw new Error("Embedding response malformed");
+  const norm = Math.sqrt(values.reduce((sum, v) => sum + v * v, 0)) || 1;
+  return values.map((v) => v / norm);
+}
+
+/* Returns { block, sources } with transcript excerpts relevant to the
+   question, or null when there is no index / retrieval fails. */
+async function retrieveCourseContext(question) {
+  const index = state.courseIndex;
+  if (!index) return null;
+  try {
+    const queryVec = await embedQuery(question.slice(0, 2000), index.dim);
+    const scored = index.chunks
+      .map((chunk) => {
+        let score = 0;
+        const emb = chunk.embedding;
+        for (let i = 0; i < queryVec.length; i++) score += queryVec[i] * emb[i];
+        return { chunk, score };
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, RETRIEVAL_TOP_K);
+    // keep only chunks reasonably close to the best match
+    const cutoff = Math.max(RETRIEVAL_MIN_SCORE, (scored[0]?.score || 0) * 0.85);
+    const kept = scored.filter((item) => item.score >= cutoff);
+    if (!kept.length) return null;
+
+    const lines = [];
+    const sources = [];
+    let budget = 9000;
+    for (const { chunk } of kept) {
+      const header = `[Video ${chunk.video} "${chunk.title}" ${fmtTime(chunk.start)} - ${fmtTime(chunk.end)}]`;
+      const line = `${header} ${chunk.text}`;
+      if (line.length > budget) break;
+      budget -= line.length;
+      lines.push(line);
+      sources.push({
+        video: chunk.video,
+        title: chunk.title,
+        start: chunk.start,
+        end: chunk.end,
+      });
+    }
+    if (!lines.length) return null;
+    return { block: lines.join("\n\n"), sources };
+  } catch (error) {
+    console.warn("Course retrieval skipped:", error);
+    return null;
+  }
+}
+
 /* ---------- Gemini API ---------- */
-function buildRequestBody(chat) {
+function buildRequestBody(chat, retrieval) {
   const recent = chat.messages
     .filter((m) => !m.error)
     .slice(-HISTORY_LIMIT)
@@ -359,6 +480,18 @@ function buildRequestBody(chat) {
   const courseContext = getContext().trim();
   if (courseContext) {
     system += `\n\nCourse notes provided by the student (prefer these when answering questions about their course):\n"""\n${courseContext}\n"""`;
+  }
+
+  if (state.courseIndex) {
+    const outline = state.courseIndex.videos
+      .map((video) => `- Video ${video.no}: ${video.title}`)
+      .join("\n");
+    system += `\n\nThis student is taking a specific course. Course outline:\n${outline}`;
+  }
+  if (retrieval) {
+    system += `\n\nTranscript excerpts relevant to the student's current question:\n${retrieval.block}\n\nWhen the answer is found in these excerpts, cite the exact place like "Video 14 (02:10 - 05:45)". If the excerpts do not cover the question, say the course transcripts don't mention it and then answer from general knowledge.`;
+  } else if (state.courseIndex) {
+    system += `\n\nNo transcript excerpts matched the current question. If the student asks where something is taught in the course, use the outline above; otherwise answer from general knowledge and say the transcripts don't mention it.`;
   }
 
   return {
@@ -498,9 +631,15 @@ async function generateReply(chat) {
   let finalText = "";
   let failed = false;
   let stopped = false;
+  let retrieval = null;
 
   try {
-    finalText = await streamGemini(buildRequestBody(chat), controller.signal, (fullText) => {
+    const lastUser = [...chat.messages].reverse().find((m) => m.role === "user");
+    if (lastUser && state.courseIndex) {
+      retrieval = await retrieveCourseContext(lastUser.text);
+      if (controller.signal.aborted) throw Object.assign(new Error("stopped"), { name: "AbortError" });
+    }
+    finalText = await streamGemini(buildRequestBody(chat, retrieval), controller.signal, (fullText) => {
       finalText = fullText;
       const now = performance.now();
       if (now - lastPaint > 90) {
@@ -535,6 +674,7 @@ async function generateReply(chat) {
     text: finalText,
     error: failed || undefined,
     stopped: stopped || undefined,
+    sources: !failed && retrieval ? retrieval.sources : undefined,
   });
   saveChats();
   renderThread();
@@ -700,6 +840,7 @@ function init() {
 
   autosize();
   els.input.focus();
+  loadCourseIndex();
 }
 
 init();

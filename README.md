@@ -10,7 +10,8 @@ A modern, Gemini-powered teaching assistant for a web development course. Ask an
 - 🗂️ **Chat history** — conversations are saved locally in your browser, with a sidebar to switch between them
 - 🔑 **Bring your own key** — enter your own free Gemini API key in Settings (stored only in your browser, sent directly to Google), or use the site's built-in key if the deployment has one configured
 - 🤖 **Model picker** — Gemini 2.5 Flash / 2.5 Pro / 2.0 Flash / 2.0 Flash Lite
-- 📚 **Course notes** — paste lecture notes or transcripts in Settings and the assistant will use them when answering questions about your course
+- 📚 **Course-aware answers (RAG)** — ship your course transcripts as an embedded search index and the assistant answers "where is X taught?" with the exact video number and time range, plus source chips under each answer
+- 📝 **Course notes** — or simply paste lecture notes in Settings and the assistant will use them
 - 🌗 **Dark & light themes**, fully responsive (mobile sidebar, safe-area aware)
 - ⏹️ Stop generation, regenerate answers, suggestion cards to get started
 
@@ -18,13 +19,35 @@ A modern, Gemini-powered teaching assistant for a web development course. Ask an
 
 ```
 public/          Static frontend (vanilla JS, no build step)
-api/chat.js      Vercel Edge Function — proxies Gemini using the
+api/chat.js      Vercel Edge Function — proxies Gemini chat using the
                  server-side GEMINI_API_KEY so the key never ships
                  to the client
+api/embed.js     Edge Function — embeds search queries for course RAG
+build_web_index.py  Builds public/data/index.json from your transcripts
 ```
 
 - If you saved **your own API key** in Settings, the browser calls the Gemini API **directly** — your key never touches the server.
 - Otherwise the frontend calls `/api/chat`, which uses the `GEMINI_API_KEY` environment variable configured on Vercel.
+
+## Make it answer from YOUR course (RAG)
+
+By default the assistant answers from Gemini's general knowledge. To make it answer from your actual course videos ("Flexbox is taught in Video 16 (00:00 - 02:40)"):
+
+```bash
+# 1. Generate transcripts (one-time, requires FFmpeg + Whisper — see below)
+python video_to_mp3.py
+python mp3_to_json.py
+
+# 2. Build the web search index (needs GEMINI_API_KEY in .env)
+python build_web_index.py
+
+# 3. Ship it
+git add public/data/index.json
+git commit -m "Add course search index"
+git push
+```
+
+The script embeds every transcript chunk with `gemini-embedding-001` and writes a compact `public/data/index.json`. The frontend detects it automatically: a "📚 Course data" badge appears, each question is matched against the transcripts client-side, and answers cite video numbers and timestamps with source chips underneath. No index file → the app quietly runs in general mode.
 
 ## Deploy to Vercel
 
